@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="lablinux">
+    <serverData>
+      <paths name="lablinux">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/python/APIC-EM-scripting" local="$USER_HOME$/PycharmProjects/APIC-EM-scripting" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>
