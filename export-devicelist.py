@@ -5,61 +5,69 @@ from pprint import pprint
 import json
 import csv
 
+# Get Ticket Function
+def Get_APIC_EM_ticket(url, header, payload):
+    ticket_ret = requests.post(url,headers=header,verify=False,data=json.dumps(payload))
+    service_ticket_raw = json.loads(ticket_ret.text)
+    return service_ticket_raw['response']['serviceTicket']
+
+#RESTAPI GET function
+def Get_REST(url, header, payload):
+    ret = requests.get(url, headers=header, data=json.dumps(payload), verify=False)
+    return json.loads(ret.text)['response']
+
 # Get Ticket
 ticket_url = 'https://192.168.9.4/api/v1/ticket'
 ticket_header = {'content-type': 'application/json'}
-ticket_content = {"username":"admin","password":"C1sco123!"}
-ticket_ret = requests.post(ticket_url,headers=ticket_header,verify=False,data=json.dumps(ticket_content))
-print('Obtaining Ticket...')
-print(ticket_ret.text)
-service_ticket_raw = json.loads(ticket_ret.text)
-service_ticket = service_ticket_raw['response']['serviceTicket']
+ticket_payload = {"username":"admin","password":"C1sco123!"}
+service_ticket = Get_APIC_EM_ticket(ticket_url, ticket_header, ticket_payload)
 
-# Build RESTAPI URL
+# Build Global URLs
 base_url = 'https://192.168.9.4/api/v1/'
 network_device_api_url = 'network-device/'
-devicelist_url = base_url + network_device_api_url
 interface_api_url = 'interface/network-device/'
+device_list_url = base_url + network_device_api_url
 
-# Parameters
+# Declare Global RESTAPI parameters
+header = {"X-Auth-Token": service_ticket,'content-type': 'application/json'}
 payload = {'scope': 'local'}
 
-# GET DEVICE LIST
-header = {"X-Auth-Token": service_ticket,'content-type': 'application/json'}
-ret = requests.get(devicelist_url,headers=header,verify=False)
-device_list = json.loads(ret.text)['response']
-
-# OPEN DEVICE LIST CSV
-device_writer = csv.writer(open('./outputs/Device_list.csv', 'w'))
-# CREATE HEADER AND ITERATE
-fields_row = ['apManagerInterfaceIp','bootDateTime','collectionStatus','family','hostname','id','instanceUuid','interfaceCount','inventoryStatusDetail','lastUpdateTime','lastUpdated','lineCardCount','lineCardId','location','locationName','macAddress','managementIpAddress','memorySize','platformId','reachabilityFailureReason','reachabilityStatus','role','roleSource','serialNumber','series','snmpContact','snmpLocation','softwareVersion','tagCount','tunnelUdpPort','type','upTime']
+# Declare Spreadsheet Headers
+# Iteration will use these fields to select what is included in CSV output
+device_fields_row = ['apManagerInterfaceIp','bootDateTime','collectionStatus','family','hostname','id','instanceUuid','interfaceCount','inventoryStatusDetail','lastUpdateTime','lastUpdated','lineCardCount','lineCardId','location','locationName','macAddress','managementIpAddress','memorySize','platformId','reachabilityFailureReason','reachabilityStatus','role','roleSource','serialNumber','series','snmpContact','snmpLocation','softwareVersion','tagCount','tunnelUdpPort','type','upTime']
 interface_fields_row = ['description','deviceId','duplex','id','ifIndex','instanceUuid','interfaceType','ipv4Address','ipv4Mask','isisSupport','lastUpdated','macAddress','mappedPhysicalInterfaceId','mappedPhysicalInterfaceName','nativeVlanId','ospfSupport','pid','portMode','portName','portType','serialNo','series','speed','status','vlanId',]
-device_writer.writerow(fields_row)
 
-# ITERATE
+# Get Device List
+device_list = Get_REST(device_list_url, header, payload)
+
+# Output Device List to CSV
+device_writer = csv.writer(open('./outputs/Device_list.csv', 'w'))
+device_writer.writerow(device_fields_row)
+
 for device in device_list:
-    # WRITE DEVICE LIST INTO CSV
+    # Identify device
+    network_device_id = device['id']
+
+    # Write device list into CSV
     row = []
-    for h in fields_row:
+    for h in device_fields_row:
         if device[h] == None:
             row.append("null")
         else:
             row.append(device[h])
     device_writer.writerow(row)
 
-    # WRITE CONFIG TO CFG FILE
-    network_device_id = device['id']
+    # Iterate and write config to text file per device
     device_config_url = base_url + network_device_api_url + network_device_id + '/config'
-    ret3 = requests.get(device_config_url,headers=header,verify=False)
-    config = json.loads(ret3.text)['response']
+    config = Get_REST(device_config_url,header,payload)
+
     configfile = open('./outputs/' + str(device['hostname'])+'.config.txt','w')
     configfile.write(config)
     configfile.close()
 
-    # obtain per device interface dict
+    # Iterate and write interfaces to CSV file per device
     device_interface_url = base_url + interface_api_url + network_device_id
-    ret4 = requests.get(device_interface_url,headers=header,verify=False)
-    interfaces = json.loads(ret4.text)['response']
+    interfaces = Get_REST(device_interface_url,header,payload)
 
     interface_writer = csv.writer(open('./outputs/' + str(device['hostname']) + '.interfaces.csv', 'w'))
     interface_writer.writerow(interface_fields_row)
@@ -68,6 +76,7 @@ for device in device_list:
         for i in interface_fields_row:
             interface_row.append(interface[i])
         interface_writer.writerow(interface_row)
+
 
 
 
